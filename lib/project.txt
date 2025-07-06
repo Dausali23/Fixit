@@ -1,0 +1,44 @@
+Project Title: FixIt - A Mobile Application for On-Demand Home Repair Services
+
+Project Description:
+FixIt is a mobile application that allows users to report home repair issues (e.g., plumbing, electrical, air-cond, maintenance, pest and infestation, appliance repairs, and etc.). The admin receives the report, assigns a technician, and updates the repair status.
+
+Roles:
+User: 
+Register/login
+Submit repair request with: 
+Description:
+Category (Plumbing, Electrical, Maintenance, etc.)
+Image of the issue (optional)
+Location
+View request status (e.g., Pending, In Progress, Completed)
+View repair history
+
+Admin:
+Login to Admin Dashboard
+View all requests
+Filter by category/status
+View request details (including image and location)
+Update status (Pending >> In Progress >> Completed)
+Assign technician name
+
+Services
+Third-Party Services:
+Google Maps API - for address/location purposes
+Firebase Firestore - stores users and requests
+Firebase Storage - stores image
+
+In-House Services:
+Repair Request Form 
+A user interface where users submit issues by entering the category, description, uploading an image, and setting location
+Admin Dashboard 
+ Interface for admin to view, filter, and manage repair requests. Include manual status updates and technician assignments.
+Role-Based Access 
+The app’s interface and access permissions change depending on whether the user is an admin or a regular user. This role verification and corresponding UI adjustment are implemented within the app itself.
+Repair History Display 
+Users have access to their complete repair request history. While the data is retrieved from Firebase, the app itself handles the design, filtering, and presentation of this information.
+Manual Technician Assignment
+The admin chooses and assigns a technician to a repair request using a dropdown menu. The technician information is stored in Firestore, the form functionality and user interface are developed in-house.
+
+
+

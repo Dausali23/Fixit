@@ -1,0 +1,60 @@
+class Technician {
+  String? id;
+  String name;
+  String email;
+  String phone;
+  String specialty;
+  int jobs;
+  double rating;
+  bool available;
+  String address;
+  double? latitude;
+  double? longitude;
+
+  Technician({
+    this.id,
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.specialty,
+    this.jobs = 0,
+    this.rating = 0.0,
+    this.available = true,
+    this.address = '',
+    this.latitude,
+    this.longitude,
+  });
+
+  // Create a Technician from a Map (used when retrieving from Firestore)
+  factory Technician.fromMap(Map<String, dynamic> map, String docId) {
+    return Technician(
+      id: docId,
+      name: map['name'] ?? '',
+      email: map['email'] ?? '',
+      phone: map['phone'] ?? '',
+      specialty: map['specialty'] ?? '',
+      jobs: map['jobs'] ?? 0,
+      rating: (map['rating'] ?? 0.0).toDouble(),
+      available: map['available'] ?? true,
+      address: map['address'] ?? '',
+      latitude: map['latitude']?.toDouble(),
+      longitude: map['longitude']?.toDouble(),
+    );
+  }
+
+  // Convert Technician to a Map (used when saving to Firestore)
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'specialty': specialty,
+      'jobs': jobs,
+      'rating': rating,
+      'available': available,
+      'address': address,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
+  }
+} 

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../services/auth_service.dart';
+import '../constants/specialty_options.dart';
 
 class RepairRequestForm extends StatefulWidget {
   const RepairRequestForm({super.key});
@@ -20,20 +21,44 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
   final TextEditingController _addressController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
   
-  String _selectedCategory = 'Plumbing';
+  String _selectedCategory = '';
+  List<String> _categories = [];
+  bool _isLoading = true;
   bool _isSubmitting = false;
   File? _imageFile;
   bool _isUploadingImage = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
   
-  final List<String> _categories = [
-    'Plumbing',
-    'Electrical',
-    'Air Conditioning',
-    'Appliance Repair',
-    'Pest Control',
-    'Maintenance',
-    'Other'
-  ];
+  Future<void> _loadCategories() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final categories = await SpecialtyOptions.getOptions();
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          _selectedCategory = categories.isNotEmpty ? categories[0] : '';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      // Fallback to default options
+      if (mounted) {
+        setState(() {
+          _categories = SpecialtyOptions.options;
+          _selectedCategory = _categories.isNotEmpty ? _categories[0] : '';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -208,6 +233,17 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Report an Issue'),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Report an Issue'),

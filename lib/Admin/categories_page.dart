@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/category.dart';
+import '../services/category_service.dart';
+import '../constants/category_options.dart';
 
 class CategoriesPage extends StatefulWidget {
   const CategoriesPage({super.key});
@@ -8,65 +12,30 @@ class CategoriesPage extends StatefulWidget {
 }
 
 class _CategoriesPageState extends State<CategoriesPage> {
-  final List<Map<String, dynamic>> _categories = [
-    {
-      'id': '1',
-      'name': 'Plumbing',
-      'icon': Icons.water_drop,
-      'color': Colors.blue,
-      'description': 'Water leaks, clogged drains, toilet issues',
-      'active': true,
-    },
-    {
-      'id': '2',
-      'name': 'Electrical',
-      'icon': Icons.electrical_services,
-      'color': Colors.amber,
-      'description': 'Power outages, wiring issues, lighting installation',
-      'active': true,
-    },
-    {
-      'id': '3',
-      'name': 'Air Conditioning',
-      'icon': Icons.ac_unit,
-      'color': Colors.lightBlue,
-      'description': 'AC not cooling, heating issues, thermostat problems',
-      'active': true,
-    },
-    {
-      'id': '4',
-      'name': 'Appliance Repair',
-      'icon': Icons.kitchen,
-      'color': Colors.green,
-      'description': 'Refrigerator, dishwasher, oven, washer/dryer issues',
-      'active': true,
-    },
-    {
-      'id': '5',
-      'name': 'Pest Control',
-      'icon': Icons.pest_control,
-      'color': Colors.brown,
-      'description': 'Insect infestations, rodent removal',
-      'active': true,
-    },
-  ];
-
+  final CategoryService _categoryService = CategoryService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize default categories if needed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _categoryService.initializeDefaultCategories();
+    });
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
-
-  List<Map<String, dynamic>> get _filteredCategories {
-    return _categories
-        .where((category) => category['name']
-            .toString()
-            .toLowerCase()
-            .contains(_searchQuery.toLowerCase()))
-        .toList();
+  
+  void _refreshPage() {
+    setState(() {
+      // Just trigger a rebuild
+    });
   }
 
   @override
@@ -74,9 +43,17 @@ class _CategoriesPageState extends State<CategoriesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Repair Categories'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshPage,
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
       body: Column(
         children: [
+          // Search box
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
@@ -106,41 +83,98 @@ class _CategoriesPageState extends State<CategoriesPage> {
               },
             ),
           ),
+          
+          // Categories list
           Expanded(
-            child: ListView.builder(
-              itemCount: _filteredCategories.length,
-              itemBuilder: (context, index) {
-                final category = _filteredCategories[index];
-                return Card(
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: category['color'],
-                      child: Icon(
-                        category['icon'],
-                        color: Colors.white,
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('categories').snapshots(),
+              builder: (context, snapshot) {
+                // Show loading spinner
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                // Handle error state
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  );
+                }
+                
+                // If no data
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(
+                    child: Text('No categories found. Add a category to get started.'),
+                  );
+                }
+                
+                // Get the categories and filter by search query
+                final categories = snapshot.data!.docs
+                  .map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return {
+                      'id': doc.id,
+                      'name': data['name'] as String? ?? '',
+                      'description': data['description'] as String? ?? '',
+                      'icon': data['icon'] as String? ?? 'build',
+                      'color': data['color'] as String? ?? 'grey',
+                      'active': data['active'] as bool? ?? true,
+                    };
+                  })
+                  .where((category) => 
+                    _searchQuery.isEmpty || 
+                    category['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase())
+                  )
+                  .toList();
+                
+                if (categories.isEmpty) {
+                  return const Center(
+                    child: Text('No matching categories found.'),
+                  );
+                }
+                
+                // Build the list
+                return ListView.builder(
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: _getColorFromString(category['color'].toString()),
+                          child: Icon(
+                            _getIconFromString(category['icon'].toString()),
+                            color: Colors.white,
+                          ),
+                        ),
+                        title: Text(category['name'].toString()),
+                        subtitle: Text(category['description'].toString()),
+                        trailing: Switch(
+                          value: category['active'] as bool,
+                          onChanged: (value) {
+                            _updateCategoryStatus(category['id'].toString(), value);
+                          },
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context, 
+                            MaterialPageRoute(
+                              builder: (context) => CategoryEditScreen(
+                                categoryId: category['id'].toString(),
+                                name: category['name'].toString(),
+                                description: category['description'].toString(),
+                                onSave: _refreshPage,
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    ),
-                    title: Text(category['name']),
-                    subtitle: Text(category['description']),
-                    trailing: Switch(
-                      value: category['active'],
-                      onChanged: (value) {
-                        setState(() {
-                          // Find actual index in original list
-                          final originalIndex = _categories.indexWhere(
-                              (c) => c['id'] == category['id']);
-                          if (originalIndex != -1) {
-                            _categories[originalIndex]['active'] = value;
-                          }
-                        });
-                      },
-                    ),
-                    onTap: () {
-                      _showCategoryEditDialog(category);
-                    },
-                  ),
+                    );
+                  },
                 );
               },
             ),
@@ -149,129 +183,567 @@ class _CategoriesPageState extends State<CategoriesPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          _showAddCategoryDialog();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CategoryAddScreen(
+                onSave: _refreshPage,
+              ),
+            ),
+          );
         },
         child: const Icon(Icons.add),
       ),
     );
   }
-
-  void _showCategoryEditDialog(Map<String, dynamic> category) {
-    final TextEditingController nameController =
-        TextEditingController(text: category['name']);
-    final TextEditingController descController =
-        TextEditingController(text: category['description']);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Category'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Category Name',
-              ),
-            ),
-            TextField(
-              controller: descController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-              ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                setState(() {
-                  // Find actual index in original list
-                  final index =
-                      _categories.indexWhere((c) => c['id'] == category['id']);
-                  if (index != -1) {
-                    _categories[index]['name'] = nameController.text;
-                    _categories[index]['description'] = descController.text;
-                  }
-                });
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    ).then((_) {
-      nameController.dispose();
-      descController.dispose();
-    });
+  
+  // Helper methods to convert string to IconData and Color
+  IconData _getIconFromString(String iconName) {
+    switch (iconName) {
+      case 'water_drop': return Icons.water_drop;
+      case 'electrical_services': return Icons.electrical_services;
+      case 'ac_unit': return Icons.ac_unit;
+      case 'kitchen': return Icons.kitchen;
+      case 'pest_control': return Icons.pest_control;
+      case 'handyman': return Icons.handyman;
+      case 'brush': return Icons.brush;
+      case 'roofing': return Icons.roofing;
+      case 'yard': return Icons.yard;
+      case 'grid_on': return Icons.grid_on;
+      default: return Icons.build;
+    }
   }
+  
+  Color _getColorFromString(String colorName) {
+    switch (colorName) {
+      case 'blue': return Colors.blue;
+      case 'amber': return Colors.amber;
+      case 'lightBlue': return Colors.lightBlue;
+      case 'green': return Colors.green;
+      case 'brown': return Colors.brown;
+      case 'orange': return Colors.orange;
+      case 'red': return Colors.red;
+      case 'purple': return Colors.purple;
+      case 'teal': return Colors.teal;
+      default: return Colors.grey;
+    }
+  }
+  
+  // Update category status
+  Future<void> _updateCategoryStatus(String id, bool active) async {
+    try {
+      await FirebaseFirestore.instance
+        .collection('categories')
+        .doc(id)
+        .update({'active': active});
+    } catch (e) {
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating status: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
 
-  void _showAddCategoryDialog() {
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController descController = TextEditingController();
+// Separate screen for adding a new category
+class CategoryAddScreen extends StatefulWidget {
+  final Function onSave;
+  
+  const CategoryAddScreen({
+    super.key,
+    required this.onSave,
+  });
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
+  @override
+  State<CategoryAddScreen> createState() => _CategoryAddScreenState();
+}
+
+class _CategoryAddScreenState extends State<CategoryAddScreen> {
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _descController = TextEditingController();
+  bool _isSaving = false;
+  String _selectedIcon = 'build';
+  String _selectedColor = 'grey';
+  
+  final List<Map<String, dynamic>> _iconOptions = [
+    {'name': 'Plumbing', 'icon': 'water_drop', 'color': 'blue'},
+    {'name': 'Electrical', 'icon': 'electrical_services', 'color': 'amber'},
+    {'name': 'HVAC', 'icon': 'ac_unit', 'color': 'lightBlue'},
+    {'name': 'Appliance', 'icon': 'kitchen', 'color': 'green'},
+    {'name': 'Pest Control', 'icon': 'pest_control', 'color': 'brown'},
+    {'name': 'Carpentry', 'icon': 'handyman', 'color': 'orange'},
+    {'name': 'Painting', 'icon': 'brush', 'color': 'purple'},
+    {'name': 'Roofing', 'icon': 'roofing', 'color': 'red'},
+    {'name': 'Landscaping', 'icon': 'yard', 'color': 'green'},
+    {'name': 'Flooring', 'icon': 'grid_on', 'color': 'teal'},
+    {'name': 'General', 'icon': 'build', 'color': 'grey'},
+  ];
+  
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
         title: const Text('Add Category'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
-              controller: nameController,
+              controller: _nameController,
               decoration: const InputDecoration(
                 labelText: 'Category Name',
+                border: OutlineInputBorder(),
               ),
+              onChanged: (value) {
+                // Suggest icon based on name
+                if (value.isNotEmpty) {
+                  for (var option in _iconOptions) {
+                    if (value.toLowerCase().contains(option['name'].toString().toLowerCase())) {
+                      setState(() {
+                        _selectedIcon = option['icon'];
+                        _selectedColor = option['color'];
+                      });
+                      break;
+                    }
+                  }
+                }
+              },
             ),
+            const SizedBox(height: 16),
             TextField(
-              controller: descController,
+              controller: _descController,
               decoration: const InputDecoration(
                 labelText: 'Description',
+                border: OutlineInputBorder(),
               ),
-              maxLines: 2,
+              maxLines: 3,
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Select Icon & Color',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              height: 200,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: GridView.builder(
+                padding: const EdgeInsets.all(8),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: _iconOptions.length,
+                itemBuilder: (context, index) {
+                  final option = _iconOptions[index];
+                  final iconName = option['icon'];
+                  final colorName = option['color'];
+                  final isSelected = _selectedIcon == iconName && _selectedColor == colorName;
+                  
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedIcon = iconName;
+                        _selectedColor = colorName;
+                      });
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.grey.shade200 : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: CircleAvatar(
+                          backgroundColor: _getColorFromString(colorName),
+                          child: Icon(
+                            _getIconFromString(iconName),
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _isSaving ? null : _saveCategory,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+              ),
+              child: _isSaving 
+                ? const CircularProgressIndicator()
+                : const Text('Save Category'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                setState(() {
-                  _categories.add({
-                    'id': (_categories.length + 1).toString(),
-                    'name': nameController.text,
-                    'description': descController.text,
-                    'icon': Icons.build,
-                    'color': Colors.grey,
-                    'active': true,
-                  });
-                });
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
       ),
-    ).then((_) {
-      nameController.dispose();
-      descController.dispose();
-    });
+    );
+  }
+  
+  // Helper methods to convert string to IconData and Color
+  IconData _getIconFromString(String iconName) {
+    switch (iconName) {
+      case 'water_drop': return Icons.water_drop;
+      case 'electrical_services': return Icons.electrical_services;
+      case 'ac_unit': return Icons.ac_unit;
+      case 'kitchen': return Icons.kitchen;
+      case 'pest_control': return Icons.pest_control;
+      case 'handyman': return Icons.handyman;
+      case 'brush': return Icons.brush;
+      case 'roofing': return Icons.roofing;
+      case 'yard': return Icons.yard;
+      case 'grid_on': return Icons.grid_on;
+      default: return Icons.build;
+    }
+  }
+  
+  Color _getColorFromString(String colorName) {
+    switch (colorName) {
+      case 'blue': return Colors.blue;
+      case 'amber': return Colors.amber;
+      case 'lightBlue': return Colors.lightBlue;
+      case 'green': return Colors.green;
+      case 'brown': return Colors.brown;
+      case 'orange': return Colors.orange;
+      case 'red': return Colors.red;
+      case 'purple': return Colors.purple;
+      case 'teal': return Colors.teal;
+      default: return Colors.grey;
+    }
+  }
+  
+  Future<void> _saveCategory() async {
+    final name = _nameController.text.trim();
+    final description = _descController.text.trim();
+    
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Category name cannot be empty'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    setState(() => _isSaving = true);
+    
+    try {
+      // Add to Firestore with selected icon and color
+      await FirebaseFirestore.instance.collection('categories').add({
+        'name': name,
+        'description': description,
+        'icon': _selectedIcon,
+        'color': _selectedColor,
+        'active': true,
+      });
+      
+      if (!mounted) return;
+      
+      widget.onSave();
+      Navigator.pop(context);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Category added successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _isSaving = false);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
+
+// Separate screen for editing a category
+class CategoryEditScreen extends StatefulWidget {
+  final String categoryId;
+  final String name;
+  final String description;
+  final Function onSave;
+  
+  const CategoryEditScreen({
+    super.key,
+    required this.categoryId,
+    required this.name,
+    required this.description,
+    required this.onSave,
+  });
+
+  @override
+  State<CategoryEditScreen> createState() => _CategoryEditScreenState();
+}
+
+class _CategoryEditScreenState extends State<CategoryEditScreen> {
+  late TextEditingController _nameController;
+  late TextEditingController _descController;
+  bool _isSaving = false;
+  String _selectedIcon = 'build';
+  String _selectedColor = 'grey';
+  
+  final List<Map<String, dynamic>> _iconOptions = [
+    {'name': 'Plumbing', 'icon': 'water_drop', 'color': 'blue'},
+    {'name': 'Electrical', 'icon': 'electrical_services', 'color': 'amber'},
+    {'name': 'HVAC', 'icon': 'ac_unit', 'color': 'lightBlue'},
+    {'name': 'Appliance', 'icon': 'kitchen', 'color': 'green'},
+    {'name': 'Pest Control', 'icon': 'pest_control', 'color': 'brown'},
+    {'name': 'Carpentry', 'icon': 'handyman', 'color': 'orange'},
+    {'name': 'Painting', 'icon': 'brush', 'color': 'purple'},
+    {'name': 'Roofing', 'icon': 'roofing', 'color': 'red'},
+    {'name': 'Landscaping', 'icon': 'yard', 'color': 'green'},
+    {'name': 'Flooring', 'icon': 'grid_on', 'color': 'teal'},
+    {'name': 'General', 'icon': 'build', 'color': 'grey'},
+  ];
+  
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.name);
+    _descController = TextEditingController(text: widget.description);
+    
+    // Load current icon and color
+    _loadCurrentIconAndColor();
+  }
+  
+  Future<void> _loadCurrentIconAndColor() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+        .collection('categories')
+        .doc(widget.categoryId)
+        .get();
+      
+      if (doc.exists && mounted) {
+        final data = doc.data() as Map<String, dynamic>;
+        setState(() {
+          _selectedIcon = data['icon'] as String? ?? 'build';
+          _selectedColor = data['color'] as String? ?? 'grey';
+        });
+      }
+    } catch (e) {
+      // Default values will be used
+    }
+  }
+  
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Edit Category'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Category Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _descController,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Select Icon & Color',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              height: 200,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: GridView.builder(
+                padding: const EdgeInsets.all(8),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: _iconOptions.length,
+                itemBuilder: (context, index) {
+                  final option = _iconOptions[index];
+                  final iconName = option['icon'];
+                  final colorName = option['color'];
+                  final isSelected = _selectedIcon == iconName && _selectedColor == colorName;
+                  
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedIcon = iconName;
+                        _selectedColor = colorName;
+                      });
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.grey.shade200 : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: CircleAvatar(
+                          backgroundColor: _getColorFromString(colorName),
+                          child: Icon(
+                            _getIconFromString(iconName),
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _isSaving ? null : _saveCategory,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+              ),
+              child: _isSaving 
+                ? const CircularProgressIndicator()
+                : const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // Helper methods to convert string to IconData and Color
+  IconData _getIconFromString(String iconName) {
+    switch (iconName) {
+      case 'water_drop': return Icons.water_drop;
+      case 'electrical_services': return Icons.electrical_services;
+      case 'ac_unit': return Icons.ac_unit;
+      case 'kitchen': return Icons.kitchen;
+      case 'pest_control': return Icons.pest_control;
+      case 'handyman': return Icons.handyman;
+      case 'brush': return Icons.brush;
+      case 'roofing': return Icons.roofing;
+      case 'yard': return Icons.yard;
+      case 'grid_on': return Icons.grid_on;
+      default: return Icons.build;
+    }
+  }
+  
+  Color _getColorFromString(String colorName) {
+    switch (colorName) {
+      case 'blue': return Colors.blue;
+      case 'amber': return Colors.amber;
+      case 'lightBlue': return Colors.lightBlue;
+      case 'green': return Colors.green;
+      case 'brown': return Colors.brown;
+      case 'orange': return Colors.orange;
+      case 'red': return Colors.red;
+      case 'purple': return Colors.purple;
+      case 'teal': return Colors.teal;
+      default: return Colors.grey;
+    }
+  }
+  
+  Future<void> _saveCategory() async {
+    final name = _nameController.text.trim();
+    final description = _descController.text.trim();
+    
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Category name cannot be empty'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    setState(() => _isSaving = true);
+    
+    try {
+      // Update in Firestore with selected icon and color
+      await FirebaseFirestore.instance
+        .collection('categories')
+        .doc(widget.categoryId)
+        .update({
+          'name': name,
+          'description': description,
+          'icon': _selectedIcon,
+          'color': _selectedColor,
+        });
+      
+      if (!mounted) return;
+      
+      widget.onSave();
+      Navigator.pop(context);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Category updated successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _isSaving = false);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 } 

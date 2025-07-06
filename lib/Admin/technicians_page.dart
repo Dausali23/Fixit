@@ -17,11 +17,32 @@ class _TechniciansPageState extends State<TechniciansPage> {
   List<Technician> _technicians = [];
   bool _isLoading = true;
   String _errorMessage = '';
+  List<String> _specialtyOptions = [];
 
   @override
   void initState() {
     super.initState();
     _loadTechnicians();
+    _loadSpecialtyOptions();
+  }
+
+  Future<void> _loadSpecialtyOptions() async {
+    try {
+      final options = await SpecialtyOptions.getOptions();
+      if (mounted) {
+        setState(() {
+          _specialtyOptions = options;
+        });
+      }
+    } catch (e) {
+      developer.log('Error loading specialty options: $e');
+      // Fall back to default options
+      if (mounted) {
+        setState(() {
+          _specialtyOptions = SpecialtyOptions.options;
+        });
+      }
+    }
   }
 
   void _loadTechnicians() {
@@ -234,16 +255,16 @@ class _TechniciansPageState extends State<TechniciansPage> {
   }
 
   void _showAddTechnicianDialog() {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    final emailController = TextEditingController();
-    final addressController = TextEditingController();
-    String selectedSpecialty = SpecialtyOptions.options.first;
-    final currentContext = context;
-    
-    // Variables to store coordinates
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController phoneController = TextEditingController();
+    final TextEditingController emailController = TextEditingController();
+    final TextEditingController addressController = TextEditingController();
+    String selectedSpecialty = _specialtyOptions.isNotEmpty ? _specialtyOptions[0] : 'Plumbing';
     double? latitude;
     double? longitude;
+
+    // Keep reference to current context for later use
+    final BuildContext currentContext = context;
     
     showDialog(
       context: currentContext,
@@ -268,7 +289,7 @@ class _TechniciansPageState extends State<TechniciansPage> {
                       border: OutlineInputBorder(),
                     ),
                     value: selectedSpecialty,
-                    items: SpecialtyOptions.options.map((String specialty) {
+                    items: _specialtyOptions.map((String specialty) {
                       return DropdownMenuItem<String>(
                         value: specialty,
                         child: Text(specialty),
@@ -437,22 +458,23 @@ class _TechniciansPageState extends State<TechniciansPage> {
   }
   
   void _showEditTechnicianDialog(Technician technician) {
-    final nameController = TextEditingController(text: technician.name);
-    final phoneController = TextEditingController(text: technician.phone);
-    final emailController = TextEditingController(text: technician.email);
-    final addressController = TextEditingController(text: technician.address);
+    final TextEditingController nameController = TextEditingController(text: technician.name);
+    final TextEditingController phoneController = TextEditingController(text: technician.phone);
+    final TextEditingController emailController = TextEditingController(text: technician.email);
+    final TextEditingController addressController = TextEditingController(text: technician.address);
+    
     String selectedSpecialty = technician.specialty;
     
-    // Store coordinates
+    // If the technician's specialty isn't in our list (maybe category was deleted), add it temporarily
+    if (!_specialtyOptions.contains(selectedSpecialty) && selectedSpecialty.isNotEmpty) {
+      _specialtyOptions = [..._specialtyOptions, selectedSpecialty];
+    }
+    
     double? latitude = technician.latitude;
     double? longitude = technician.longitude;
     
-    // Store context locally
-    final currentContext = context;
-    
-    if (!SpecialtyOptions.options.contains(selectedSpecialty)) {
-      selectedSpecialty = SpecialtyOptions.options.first;
-    }
+    // Keep reference to current context for later use
+    final BuildContext currentContext = context;
     
     showDialog(
       context: currentContext,
@@ -477,7 +499,7 @@ class _TechniciansPageState extends State<TechniciansPage> {
                       border: OutlineInputBorder(),
                     ),
                     value: selectedSpecialty,
-                    items: SpecialtyOptions.options.map((String specialty) {
+                    items: _specialtyOptions.map((String specialty) {
                       return DropdownMenuItem<String>(
                         value: specialty,
                         child: Text(specialty),

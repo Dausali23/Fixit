@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../services/auth_service.dart';
 import '../constants/specialty_options.dart';
+import '../components/location_picker.dart';
 
 class RepairRequestForm extends StatefulWidget {
   const RepairRequestForm({super.key});
@@ -27,6 +28,8 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
   bool _isSubmitting = false;
   File? _imageFile;
   bool _isUploadingImage = false;
+  double? _selectedLatitude;
+  double? _selectedLongitude;
 
   @override
   void initState() {
@@ -164,6 +167,8 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
           'category': _selectedCategory,
           'description': _descriptionController.text,
           'address': _addressController.text,
+          'latitude': _selectedLatitude,
+          'longitude': _selectedLongitude,
           'status': 'Pending',
           'hasImage': _imageFile != null,
           'imageUrl': imageUrl,
@@ -319,6 +324,30 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                       return 'Please enter the address';
                     }
                     return null;
+                  },
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.map),
+                  label: const Text('Set Location on Map'),
+                  onPressed: _isSubmitting ? null : () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LocationPicker(
+                          initialAddress: _addressController.text,
+                          initialLatitude: _selectedLatitude,
+                          initialLongitude: _selectedLongitude,
+                          onLocationSelected: (address, lat, lng) {
+                            setState(() {
+                              _addressController.text = address;
+                              _selectedLatitude = lat;
+                              _selectedLongitude = lng;
+                            });
+                          },
+                        ),
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(height: 20),

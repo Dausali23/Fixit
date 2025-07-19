@@ -3,7 +3,7 @@ class Technician {
   String name;
   String email;
   String phone;
-  String specialty;
+  List<String> specialties;
   int jobs;
   double rating;
   bool available;
@@ -16,7 +16,7 @@ class Technician {
     required this.name,
     required this.email,
     required this.phone,
-    required this.specialty,
+    required this.specialties,
     this.jobs = 0,
     this.rating = 0.0,
     this.available = true,
@@ -27,12 +27,23 @@ class Technician {
 
   // Create a Technician from a Map (used when retrieving from Firestore)
   factory Technician.fromMap(Map<String, dynamic> map, String docId) {
+    // Handle both new format (List) and old format (String) for backward compatibility
+    List<String> getSpecialties() {
+      if (map['specialties'] != null) {
+        return List<String>.from(map['specialties']);
+      } else if (map['specialty'] != null) {
+        // Convert old format to new format
+        return [map['specialty'] as String];
+      }
+      return [];
+    }
+    
     return Technician(
       id: docId,
       name: map['name'] ?? '',
       email: map['email'] ?? '',
       phone: map['phone'] ?? '',
-      specialty: map['specialty'] ?? '',
+      specialties: getSpecialties(),
       jobs: map['jobs'] ?? 0,
       rating: (map['rating'] ?? 0.0).toDouble(),
       available: map['available'] ?? true,
@@ -48,7 +59,7 @@ class Technician {
       'name': name,
       'email': email,
       'phone': phone,
-      'specialty': specialty,
+      'specialties': specialties,
       'jobs': jobs,
       'rating': rating,
       'available': available,

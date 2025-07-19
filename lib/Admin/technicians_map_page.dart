@@ -66,7 +66,7 @@ class _TechniciansMapPageState extends State<TechniciansMapPage> {
             position: LatLng(technician.latitude!, technician.longitude!),
             infoWindow: InfoWindow(
               title: technician.name,
-              snippet: '${technician.specialty} - ${technician.available ? 'Available' : 'Unavailable'}',
+              snippet: '${technician.specialties.isNotEmpty ? technician.specialties.join(", ") : "No specialty"} - ${technician.available ? 'Available' : 'Unavailable'}',
             ),
             icon: BitmapDescriptor.defaultMarkerWithHue(
               technician.available ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dart:developer' as developer;
 
 class LocationPicker extends StatefulWidget {
@@ -187,41 +188,95 @@ class _LocationPickerState extends State<LocationPicker> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _addressController,
-                    decoration: InputDecoration(
-                      labelText: 'Address',
-                      hintText: 'Enter an address to search',
-                      suffixIcon: _isSearching 
-                          ? const CircularProgressIndicator()
-                          : IconButton(
-                              icon: const Icon(Icons.search),
-                              onPressed: () => _geocodeAddress(_addressController.text),
-                            ),
-                      errorText: _errorMessage.isNotEmpty ? _errorMessage : null,
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _addressController,
+                        decoration: InputDecoration(
+                          labelText: 'Address',
+                          hintText: 'Enter an address to search',
+                          suffixIcon: _isSearching 
+                              ? const CircularProgressIndicator()
+                              : IconButton(
+                                  icon: const Icon(Icons.search),
+                                  onPressed: () => _geocodeAddress(_addressController.text),
+                                ),
+                          errorText: _errorMessage.isNotEmpty ? _errorMessage : null,
+                        ),
+                        onSubmitted: (_) => _geocodeAddress(_addressController.text),
+                      ),
                     ),
-                    onSubmitted: (_) => _geocodeAddress(_addressController.text),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: GoogleMap(
-              onMapCreated: _onMapCreated,
-              initialCameraPosition: CameraPosition(
-                target: _center,
-                zoom: 14.0,
               ),
-              onTap: _onMapTapped,
-              markers: _marker != null ? <Marker>{_marker!} : <Marker>{},
+              Expanded(
+                child: GoogleMap(
+                  onMapCreated: _onMapCreated,
+                  initialCameraPosition: CameraPosition(
+                    target: _center,
+                    zoom: 14.0,
+                  ),
+                  onTap: _onMapTapped,
+                  markers: _marker != null ? <Marker>{_marker!} : <Marker>{},
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            bottom: 24,
+            right: 24,
+            child: FloatingActionButton(
+              heroTag: 'current_location',
+              onPressed: () async {
+                try {
+                  bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+                  if (!serviceEnabled) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Location services are disabled.')),
+                    );
+                    return;
+                  }
+                  LocationPermission permission = await Geolocator.checkPermission();
+                  if (permission == LocationPermission.denied) {
+                    permission = await Geolocator.requestPermission();
+                    if (permission == LocationPermission.denied) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Location permissions are denied.')),
+                      );
+                      return;
+                    }
+                  }
+                  if (permission == LocationPermission.deniedForever) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Location permissions are permanently denied.')),
+                    );
+                    return;
+                  }
+                  Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+                  LatLng currentLatLng = LatLng(position.latitude, position.longitude);
+                  setState(() {
+                    _center = currentLatLng;
+                    _marker = Marker(
+                      markerId: const MarkerId('selected_location'),
+                      position: currentLatLng,
+                    );
+                  });
+                  _mapController.animateCamera(CameraUpdate.newLatLng(currentLatLng));
+                  await _reverseGeocode(currentLatLng);
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error getting current location: $e')),
+                  );
+                }
+              },
+              child: const Icon(Icons.my_location),
             ),
           ),
         ],

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/category.dart';
 import '../services/category_service.dart';
-import '../constants/category_options.dart';
 
 class CategoriesPage extends StatefulWidget {
   const CategoriesPage({super.key});
@@ -15,8 +13,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
   final CategoryService _categoryService = CategoryService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  bool _isLoading = false;
-
+  
   @override
   void initState() {
     super.initState();

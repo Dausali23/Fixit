@@ -60,7 +60,7 @@ class _TechniciansPageState extends State<TechniciansPage> {
             // Debug log
             developer.log('Loaded ${technicians.length} technicians');
             for (var tech in technicians) {
-              developer.log('Technician: ${tech.name}, ${tech.specialty}');
+              developer.log('Technician: ${tech.name}, ${tech.specialties.join(", ")}');
             }
           });
         }
@@ -150,7 +150,7 @@ class _TechniciansPageState extends State<TechniciansPage> {
                       child: Text(technician.name[0]),
                     ),
                     title: Text(technician.name),
-                    subtitle: Text('${technician.specialty} • ${technician.jobs} jobs completed'),
+                    subtitle: Text('${technician.specialties.join(", ")} • ${technician.jobs} jobs completed'),
                     trailing: Switch(
                       value: technician.available,
                       onChanged: (value) async {
@@ -194,7 +194,7 @@ class _TechniciansPageState extends State<TechniciansPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Specialty: ${technician.specialty}'),
+            Text('Specialties: ${technician.specialties.join(", ")}'),
             Text('Phone: ${technician.phone}'),
             Text('Email: ${technician.email}'),
             Text('Address: ${technician.address}'),
@@ -259,7 +259,7 @@ class _TechniciansPageState extends State<TechniciansPage> {
     final TextEditingController phoneController = TextEditingController();
     final TextEditingController emailController = TextEditingController();
     final TextEditingController addressController = TextEditingController();
-    String selectedSpecialty = _specialtyOptions.isNotEmpty ? _specialtyOptions[0] : 'Plumbing';
+    List<String> selectedSpecialties = [];
     double? latitude;
     double? longitude;
 
@@ -283,25 +283,41 @@ class _TechniciansPageState extends State<TechniciansPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: 'Specialty',
-                      border: OutlineInputBorder(),
+                  const Text(
+                    'Specialties',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
                     ),
-                    value: selectedSpecialty,
-                    items: _specialtyOptions.map((String specialty) {
-                      return DropdownMenuItem<String>(
-                        value: specialty,
-                        child: Text(specialty),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      if (newValue != null) {
-                        setState(() {
-                          selectedSpecialty = newValue;
-                        });
-                      }
-                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 200,
+                    width: double.maxFinite,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _specialtyOptions.length,
+                      itemBuilder: (context, index) {
+                        final specialty = _specialtyOptions[index];
+                        return CheckboxListTile(
+                          title: Text(specialty),
+                          value: selectedSpecialties.contains(specialty),
+                          onChanged: (bool? value) {
+                            setState(() {
+                              if (value == true) {
+                                selectedSpecialties.add(specialty);
+                              } else {
+                                selectedSpecialties.remove(specialty);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -374,7 +390,8 @@ class _TechniciansPageState extends State<TechniciansPage> {
                   if (nameController.text.isEmpty || 
                       phoneController.text.isEmpty ||
                       emailController.text.isEmpty ||
-                      addressController.text.isEmpty) {
+                      addressController.text.isEmpty ||
+                      selectedSpecialties.isEmpty) {
                     // Show validation error
                     ScaffoldMessenger.of(dialogContext).showSnackBar(
                       const SnackBar(
@@ -399,7 +416,7 @@ class _TechniciansPageState extends State<TechniciansPage> {
                   // Create technician object
                   final newTechnician = Technician(
                     name: nameController.text,
-                    specialty: selectedSpecialty,
+                    specialties: selectedSpecialties,
                     phone: phoneController.text,
                     email: emailController.text,
                     address: addressController.text,
@@ -463,12 +480,7 @@ class _TechniciansPageState extends State<TechniciansPage> {
     final TextEditingController emailController = TextEditingController(text: technician.email);
     final TextEditingController addressController = TextEditingController(text: technician.address);
     
-    String selectedSpecialty = technician.specialty;
-    
-    // If the technician's specialty isn't in our list (maybe category was deleted), add it temporarily
-    if (!_specialtyOptions.contains(selectedSpecialty) && selectedSpecialty.isNotEmpty) {
-      _specialtyOptions = [..._specialtyOptions, selectedSpecialty];
-    }
+    List<String> selectedSpecialties = List.from(technician.specialties);
     
     double? latitude = technician.latitude;
     double? longitude = technician.longitude;
@@ -493,25 +505,41 @@ class _TechniciansPageState extends State<TechniciansPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: 'Specialty',
-                      border: OutlineInputBorder(),
+                  const Text(
+                    'Specialties',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
                     ),
-                    value: selectedSpecialty,
-                    items: _specialtyOptions.map((String specialty) {
-                      return DropdownMenuItem<String>(
-                        value: specialty,
-                        child: Text(specialty),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      if (newValue != null) {
-                        setState(() {
-                          selectedSpecialty = newValue;
-                        });
-                      }
-                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 200,
+                    width: double.maxFinite,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _specialtyOptions.length,
+                      itemBuilder: (context, index) {
+                        final specialty = _specialtyOptions[index];
+                        return CheckboxListTile(
+                          title: Text(specialty),
+                          value: selectedSpecialties.contains(specialty),
+                          onChanged: (bool? value) {
+                            setState(() {
+                              if (value == true) {
+                                selectedSpecialties.add(specialty);
+                              } else {
+                                selectedSpecialties.remove(specialty);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -584,7 +612,8 @@ class _TechniciansPageState extends State<TechniciansPage> {
                       nameController.text.isNotEmpty && 
                       phoneController.text.isNotEmpty &&
                       emailController.text.isNotEmpty &&
-                      addressController.text.isNotEmpty) {
+                      addressController.text.isNotEmpty &&
+                      selectedSpecialties.isNotEmpty) {
                     
                     // Always close dialog first
                     Navigator.pop(context);
@@ -592,7 +621,7 @@ class _TechniciansPageState extends State<TechniciansPage> {
                     final updatedTechnician = Technician(
                       id: technician.id,
                       name: nameController.text,
-                      specialty: selectedSpecialty,
+                      specialties: selectedSpecialties,
                       phone: phoneController.text,
                       email: emailController.text,
                       address: addressController.text,

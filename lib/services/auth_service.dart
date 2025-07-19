@@ -145,6 +145,38 @@ class AuthService {
     return user.displayName ?? user.email ?? '';
   }
   
+  // Get user profile data from Firestore
+  Future<Map<String, dynamic>?> getUserProfile() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return null;
+      
+      final docSnapshot = await _firestore.collection('users').doc(user.uid).get();
+      if (docSnapshot.exists) {
+        return docSnapshot.data();
+      }
+      return null;
+    } catch (e) {
+      developer.log('Error getting user profile: $e');
+      return null;
+    }
+  }
+  
+  // Update user profile data in Firestore
+  Future<bool> updateUserProfile(Map<String, dynamic> profileData) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+      
+      await _firestore.collection('users').doc(user.uid).update(profileData);
+      developer.log('User profile updated successfully');
+      return true;
+    } catch (e) {
+      developer.log('Error updating user profile: $e');
+      return false;
+    }
+  }
+  
   // Direct check if current user is admin - avoids the problematic type casting
   Future<bool> isUserAdmin() async {
     try {

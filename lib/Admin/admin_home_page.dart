@@ -5,7 +5,6 @@ import 'request_list_page.dart';
 import 'technicians_page.dart';
 import 'technicians_map_page.dart';
 import 'categories_page.dart';
-import 'settings_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AdminHomePage extends StatefulWidget {
@@ -242,7 +241,7 @@ class _ActionButtonsGrid extends StatelessWidget {
         mainAxisSpacing: 16,
       ),
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: 5,
+      itemCount: 4,
       itemBuilder: (context, index) {
         switch (index) {
           case 0:
@@ -290,18 +289,6 @@ class _ActionButtonsGrid extends StatelessWidget {
                 Navigator.push(
                   context, 
                   MaterialPageRoute(builder: (context) => const CategoriesPage())
-                );
-              },
-            );
-          case 4:
-            return _ActionButton(
-              title: 'Settings',
-              icon: Icons.settings,
-              color: Colors.grey,
-              onPressed: () {
-                Navigator.push(
-                  context, 
-                  MaterialPageRoute(builder: (context) => const SettingsPage())
                 );
               },
             );

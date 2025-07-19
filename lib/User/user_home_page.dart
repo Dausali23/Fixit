@@ -3,6 +3,7 @@ import '../services/auth_service.dart';
 import 'login_page.dart';
 import 'repair_request_form.dart';
 import 'repair_history_page.dart';
+import 'profile_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -29,6 +30,16 @@ class _UserHomePageState extends State<UserHomePage> {
       appBar: AppBar(
         title: const Text('FixIt'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
+            },
+            tooltip: 'Profile',
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _logout,

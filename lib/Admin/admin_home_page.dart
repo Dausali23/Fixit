@@ -6,6 +6,7 @@ import 'technicians_page.dart';
 import 'technicians_map_page.dart';
 import 'categories_page.dart';
 import 'settings_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -100,30 +101,79 @@ class _DashboardSummary extends StatelessWidget {
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
       physics: const NeverScrollableScrollPhysics(),
-      children: const [
-        _SummaryCard(
-          title: 'Pending Requests',
-          value: '0',
-          color: Colors.orange,
-          icon: Icons.pending_actions,
+      children: [
+        // Pending Requests
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('requests')
+              .where('status', isEqualTo: 'Pending')
+              .snapshots(),
+          builder: (context, snapshot) {
+            int count = 0;
+            if (snapshot.hasData) {
+              count = snapshot.data!.docs.length;
+            }
+            return _SummaryCard(
+              title: 'Pending Requests',
+              value: count.toString(),
+              color: Colors.orange,
+              icon: Icons.pending_actions,
+            );
+          },
         ),
-        _SummaryCard(
-          title: 'In Progress',
-          value: '0',
-          color: Colors.blue,
-          icon: Icons.engineering,
+        // In Progress
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('requests')
+              .where('status', isEqualTo: 'In Progress')
+              .snapshots(),
+          builder: (context, snapshot) {
+            int count = 0;
+            if (snapshot.hasData) {
+              count = snapshot.data!.docs.length;
+            }
+            return _SummaryCard(
+              title: 'In Progress',
+              value: count.toString(),
+              color: Colors.blue,
+              icon: Icons.engineering,
+            );
+          },
         ),
-        _SummaryCard(
-          title: 'Completed',
-          value: '0',
-          color: Colors.green,
-          icon: Icons.check_circle,
+        // Completed
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('requests')
+              .where('status', isEqualTo: 'Completed')
+              .snapshots(),
+          builder: (context, snapshot) {
+            int count = 0;
+            if (snapshot.hasData) {
+              count = snapshot.data!.docs.length;
+            }
+            return _SummaryCard(
+              title: 'Completed',
+              value: count.toString(),
+              color: Colors.green,
+              icon: Icons.check_circle,
+            );
+          },
         ),
-        _SummaryCard(
-          title: 'Total Requests',
-          value: '0',
-          color: Colors.purple,
-          icon: Icons.analytics,
+        // Total Requests
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('requests').snapshots(),
+          builder: (context, snapshot) {
+            int count = 0;
+            if (snapshot.hasData) {
+              count = snapshot.data!.docs.length;
+            }
+            return _SummaryCard(
+              title: 'Total Requests',
+              value: count.toString(),
+              color: Colors.purple,
+              icon: Icons.analytics,
+            );
+          },
         ),
       ],
     );

@@ -82,13 +82,19 @@ class AuthService {
         );
       } catch (e) {
         // Check if this is the specific type casting error we're seeing
-        if (e.toString().contains("type 'List<Object?>' is not a subtype of type 'PigeonUserDetails?'")) {
+        if (e.toString().contains("type 'List<Object?>' is not a subtype of type 'PigeonUserDetails?'") ) {
           // The registration likely succeeded despite the error
           developer.log('Caught type casting error but registration may have succeeded');
           
           // Check if we have a user now
           if (_auth.currentUser != null) {
             developer.log('User is registered despite error: ${_auth.currentUser?.email}');
+            // Create user profile in Firestore
+            await _firestore.collection('users').doc(_auth.currentUser!.uid).set({
+              'name': name,
+              'email': email,
+              'phone': phone,
+            });
             return true;
           }
         }
@@ -107,6 +113,12 @@ class AuthService {
       }
       
       developer.log('Registration successful: ${user.email}');
+      // Create user profile in Firestore
+      await _firestore.collection('users').doc(user.uid).set({
+        'name': name,
+        'email': email,
+        'phone': phone,
+      });
       return true;
     } catch (e) {
       developer.log('Registration error: $e');

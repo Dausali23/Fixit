@@ -101,25 +101,83 @@ class _RepairHistoryPageState extends State<RepairHistoryPage> {
 
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ListTile(
-                title: Text(category),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+              child: Column(
+                children: [
+                  ListTile(
+                    title: Text(category),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text('Date: $formattedDate'),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text('Date: $formattedDate'),
-                  ],
-                ),
-                trailing: Chip(
-                  label: Text(status),
-                  backgroundColor: _getStatusColor(status),
-                ),
-                onTap: () => _showRequestDetails(requestId, request),
+                    trailing: Chip(
+                      label: Text(status),
+                      backgroundColor: _getStatusColor(status),
+                    ),
+                    onTap: () => _showRequestDetails(requestId, request),
+                  ),
+                  if (status.toLowerCase() == 'in progress')
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0, right: 16.0),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            print('Done Repair button pressed for request: $requestId');
+                            print('Request data: $request');
+                            print('Technician data: ${request['technician']}');
+                            
+                            // Mark request as completed
+                            await FirebaseFirestore.instance
+                                .collection('requests')
+                                .doc(requestId)
+                                .update({'status': 'Completed'});
+                            
+                            // Set technician available if assigned
+                            if (request['technician'] is Map && request['technician']['id'] != null) {
+                              print('Updating technician availability for ID: ${request['technician']['id']}');
+                              try {
+                                await FirebaseFirestore.instance
+                                    .collection('technicians')
+                                    .doc(request['technician']['id'])
+                                    .update({'available': true});
+                                print('Technician availability updated successfully');
+                                
+                                // Verify the update
+                                final techDoc = await FirebaseFirestore.instance
+                                    .collection('technicians')
+                                    .doc(request['technician']['id'])
+                                    .get();
+                                print('Technician document after update: ${techDoc.data()}');
+                              } catch (e) {
+                                print('Error updating technician availability: $e');
+                              }
+                            } else {
+                              print('No technician assigned or invalid technician data');
+                            }
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Repair marked as completed!')),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Done Repair'),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             );
           },
@@ -164,6 +222,7 @@ class _RepairHistoryPageState extends State<RepairHistoryPage> {
 
   void _showRequestDetails(String requestId, Map<String, dynamic> request) {
     final status = request['status'] as String? ?? 'Pending';
+    print('Request status: $status');
     final category = request['category'] as String? ?? 'Unknown';
     final description = request['description'] as String? ?? 'No description';
     final address = request['address'] as String? ?? 'No address provided';
@@ -212,7 +271,57 @@ class _RepairHistoryPageState extends State<RepairHistoryPage> {
                 Text('Request ID: $requestId'),
                 Text('Technician: $technician'),
                 const SizedBox(height: 16),
-                if (status != 'Completed') ...[
+                if (status.toLowerCase() == 'in progress') ...[
+                  ElevatedButton(
+                    onPressed: () async {
+                      print('Done Repair button pressed (modal) for request: $requestId');
+                      print('Request data: $request');
+                      print('Technician data: ${request['technician']}');
+                      
+                      // Mark request as completed
+                      await FirebaseFirestore.instance
+                          .collection('requests')
+                          .doc(requestId)
+                          .update({'status': 'Completed'});
+                      
+                      // Set technician available if assigned
+                      if (request['technician'] != null && request['technician']['id'] != null) {
+                        print('Updating technician availability (modal) for ID: ${request['technician']['id']}');
+                        try {
+                          await FirebaseFirestore.instance
+                              .collection('technicians')
+                              .doc(request['technician']['id'])
+                              .update({'available': true});
+                          print('Technician availability updated successfully (modal)');
+                          
+                          // Verify the update
+                          final techDoc = await FirebaseFirestore.instance
+                              .collection('technicians')
+                              .doc(request['technician']['id'])
+                              .get();
+                          print('Technician document after update (modal): ${techDoc.data()}');
+                        } catch (e) {
+                          print('Error updating technician availability (modal): $e');
+                        }
+                      } else {
+                        print('No technician assigned or invalid technician data (modal)');
+                      }
+                      
+                      if (mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Repair marked as completed!')),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Done Repair'),
+                  ),
+                ],
+                if (status.toLowerCase() != 'completed') ...[
                   OutlinedButton(
                     onPressed: () {
                       // Cancel request

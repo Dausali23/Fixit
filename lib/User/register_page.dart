@@ -26,24 +26,34 @@ class _RegisterPageState extends State<RegisterPage> {
         _isLoading = true;
       });
 
-      // Start registration in the background without waiting
-      _authService.registerWithEmailPassword(
+      // Wait for registration to complete
+      bool success = await _authService.registerWithEmailPassword(
         _emailController.text.trim(),
         _passwordController.text.trim(),
         _nameController.text.trim(),
         _phoneController.text.trim(),
       );
 
-      // Show success message immediately
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Registration successful! Please login.'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      
-      // Navigate back to login screen immediately
-      Navigator.pop(context);
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Registration successful! Please login.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Registration failed. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

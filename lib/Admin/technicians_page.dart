@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:developer' as developer;
+import 'dart:async';
 import '../models/technician.dart';
 import '../services/technician_service.dart';
 import '../constants/specialty_options.dart';
@@ -18,12 +19,19 @@ class _TechniciansPageState extends State<TechniciansPage> {
   bool _isLoading = true;
   String _errorMessage = '';
   List<String> _specialtyOptions = [];
+  StreamSubscription<List<Technician>>? _techniciansSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadTechnicians();
     _loadSpecialtyOptions();
+  }
+
+  @override
+  void dispose() {
+    _techniciansSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadSpecialtyOptions() async {
@@ -46,11 +54,16 @@ class _TechniciansPageState extends State<TechniciansPage> {
   }
 
   void _loadTechnicians() {
-    _isLoading = true;
-    _errorMessage = '';
-    
     // Cancel previous subscription if exists
-    _technicianService.getTechnicians().listen(
+    _techniciansSubscription?.cancel();
+    
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+    
+    // Create new subscription
+    _techniciansSubscription = _technicianService.getTechnicians().listen(
       (technicians) {
         if (mounted) {
           setState(() {
@@ -255,223 +268,17 @@ class _TechniciansPageState extends State<TechniciansPage> {
   }
 
   void _showAddTechnicianDialog() {
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController phoneController = TextEditingController();
-    final TextEditingController emailController = TextEditingController();
-    final TextEditingController addressController = TextEditingController();
-    List<String> selectedSpecialties = [];
-    double? latitude;
-    double? longitude;
-
-    // Keep reference to current context for later use
-    final BuildContext currentContext = context;
-    
-    showDialog(
-      context: currentContext,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('Add Technician'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Specialties',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 200,
-                    width: double.maxFinite,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _specialtyOptions.length,
-                      itemBuilder: (context, index) {
-                        final specialty = _specialtyOptions[index];
-                        return CheckboxListTile(
-                          title: Text(specialty),
-                          value: selectedSpecialties.contains(specialty),
-                          onChanged: (bool? value) {
-                            setState(() {
-                              if (value == true) {
-                                selectedSpecialties.add(specialty);
-                              } else {
-                                selectedSpecialties.remove(specialty);
-                              }
-                            });
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: phoneController,
-                    decoration: const InputDecoration(
-                      labelText: 'Phone',
-                    ),
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: addressController,
-                          decoration: const InputDecoration(
-                            labelText: 'Address',
-                            hintText: 'Enter technician location',
-                          ),
-                          keyboardType: TextInputType.streetAddress,
-                          maxLines: 2,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.map),
-                        tooltip: 'Pick location on map',
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => LocationPicker(
-                                initialAddress: addressController.text,
-                                initialLatitude: latitude,
-                                initialLongitude: longitude,
-                                onLocationSelected: (address, lat, lng) {
-                                  setState(() {
-                                    addressController.text = address;
-                                    latitude = lat;
-                                    longitude = lng;
-                                  });
-                                },
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(dialogContext);
-                },
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  // Validate fields
-                  if (nameController.text.isEmpty || 
-                      phoneController.text.isEmpty ||
-                      emailController.text.isEmpty ||
-                      addressController.text.isEmpty ||
-                      selectedSpecialties.isEmpty) {
-                    // Show validation error
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please fill all required fields'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-                  
-                  // First close the dialog
-                  Navigator.pop(dialogContext);
-                  
-                  // Show loading indicator
-                  ScaffoldMessenger.of(currentContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('Adding technician...'),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
-                  
-                  // Create technician object
-                  final newTechnician = Technician(
-                    name: nameController.text,
-                    specialties: selectedSpecialties,
-                    phone: phoneController.text,
-                    email: emailController.text,
-                    address: addressController.text,
-                    latitude: latitude,
-                    longitude: longitude,
-                  );
-                  
-                  // Add to Firebase in the background
-                  _technicianService.addTechnician(newTechnician).then((result) {
-                    if (mounted) {
-                      _loadTechnicians(); // Refresh the list
-                      
-                      if (result != null) {
-                        // Success message
-                        ScaffoldMessenger.of(currentContext).showSnackBar(
-                          const SnackBar(
-                            content: Text('Technician added successfully'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      } else {
-                        // Error message
-                        ScaffoldMessenger.of(currentContext).showSnackBar(
-                          const SnackBar(
-                            content: Text('Failed to add technician'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  }).catchError((error) {
-                    if (mounted) {
-                      developer.log('Error adding technician: $error');
-                      ScaffoldMessenger.of(currentContext).showSnackBar(
-                        SnackBar(
-                          content: Text('Error: ${error.toString()}'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  });
-                },
-                child: const Text('Add'),
-              ),
-            ],
-          );
-        }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddTechnicianScreen(
+          specialtyOptions: _specialtyOptions,
+          onTechnicianAdded: () {
+            // The stream will automatically update
+          },
+        ),
       ),
-    ).then((_) {
-      // Dispose controllers
-      nameController.dispose();
-      phoneController.dispose();
-      emailController.dispose();
-      addressController.dispose();
-    });
+    );
   }
   
   void _showEditTechnicianDialog(Technician technician) {
@@ -485,11 +292,9 @@ class _TechniciansPageState extends State<TechniciansPage> {
     double? latitude = technician.latitude;
     double? longitude = technician.longitude;
     
-    // Keep reference to current context for later use
-    final BuildContext currentContext = context;
-    
     showDialog(
-      context: currentContext,
+      context: context,
+      barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
@@ -608,16 +413,13 @@ class _TechniciansPageState extends State<TechniciansPage> {
               ),
               TextButton(
                 onPressed: () async {
-                  if (technician.id != null &&
+                                    if (technician.id != null &&
                       nameController.text.isNotEmpty && 
                       phoneController.text.isNotEmpty &&
                       emailController.text.isNotEmpty &&
                       addressController.text.isNotEmpty &&
                       selectedSpecialties.isNotEmpty) {
                     
-                    // Always close dialog first
-                    Navigator.pop(context);
-                        
                     final updatedTechnician = Technician(
                       id: technician.id,
                       name: nameController.text,
@@ -634,12 +436,15 @@ class _TechniciansPageState extends State<TechniciansPage> {
                     
                     try {
                       final success = await _technicianService.updateTechnician(updatedTechnician);
+                      
+                      // Close dialog after operation
+                      Navigator.pop(context);
+                      
                       if (mounted) {
                         if (success) {
-                          // Refresh the technicians list
-                          _loadTechnicians();
+                          // Don't call _loadTechnicians() - the stream will automatically update
                           // Show success message
-                          ScaffoldMessenger.of(currentContext).showSnackBar(
+                          ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Technician updated successfully'),
                               backgroundColor: Colors.green,
@@ -647,7 +452,7 @@ class _TechniciansPageState extends State<TechniciansPage> {
                           );
                         } else {
                           // Failed but no exception
-                          ScaffoldMessenger.of(currentContext).showSnackBar(
+                          ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Failed to update technician'),
                               backgroundColor: Colors.red,
@@ -656,9 +461,12 @@ class _TechniciansPageState extends State<TechniciansPage> {
                         }
                       }
                     } catch (e) {
+                      // Close dialog even if there's an error
+                      Navigator.pop(context);
+                      
                       developer.log('Error updating technician: $e');
                       if (mounted) {
-                        ScaffoldMessenger.of(currentContext).showSnackBar(
+                        ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Error: ${e.toString()}'),
                             backgroundColor: Colors.red,
@@ -688,5 +496,239 @@ class _TechniciansPageState extends State<TechniciansPage> {
       emailController.dispose();
       addressController.dispose();
     });
+  }
+}
+
+class AddTechnicianScreen extends StatefulWidget {
+  final List<String> specialtyOptions;
+  final VoidCallback onTechnicianAdded;
+
+  const AddTechnicianScreen({
+    super.key,
+    required this.specialtyOptions,
+    required this.onTechnicianAdded,
+  });
+
+  @override
+  State<AddTechnicianScreen> createState() => _AddTechnicianScreenState();
+}
+
+class _AddTechnicianScreenState extends State<AddTechnicianScreen> {
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TechnicianService _technicianService = TechnicianService();
+  
+  List<String> _selectedSpecialties = [];
+  double? _latitude;
+  double? _longitude;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Add Technician'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Specialties',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 200,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: widget.specialtyOptions.length,
+                itemBuilder: (context, index) {
+                  final specialty = widget.specialtyOptions[index];
+                  return CheckboxListTile(
+                    title: Text(specialty),
+                    value: _selectedSpecialties.contains(specialty),
+                    onChanged: (bool? value) {
+                      setState(() {
+                        if (value == true) {
+                          _selectedSpecialties.add(specialty);
+                        } else {
+                          _selectedSpecialties.remove(specialty);
+                        }
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _phoneController,
+              decoration: const InputDecoration(
+                labelText: 'Phone',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _emailController,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _addressController,
+                    decoration: const InputDecoration(
+                      labelText: 'Address',
+                      hintText: 'Enter technician location',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.streetAddress,
+                    maxLines: 2,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.map),
+                  tooltip: 'Pick location on map',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LocationPicker(
+                          initialAddress: _addressController.text,
+                          initialLatitude: _latitude,
+                          initialLongitude: _longitude,
+                          onLocationSelected: (address, lat, lng) {
+                            setState(() {
+                              _addressController.text = address;
+                              _latitude = lat;
+                              _longitude = lng;
+                            });
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _addTechnician,
+              child: _isLoading
+                  ? const CircularProgressIndicator()
+                  : const Text('Add Technician'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addTechnician() async {
+    // Validate fields
+    if (_nameController.text.isEmpty || 
+        _phoneController.text.isEmpty ||
+        _emailController.text.isEmpty ||
+        _addressController.text.isEmpty ||
+        _selectedSpecialties.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill all required fields'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Create technician object
+      final newTechnician = Technician(
+        name: _nameController.text,
+        specialties: _selectedSpecialties,
+        phone: _phoneController.text,
+        email: _emailController.text,
+        address: _addressController.text,
+        latitude: _latitude,
+        longitude: _longitude,
+      );
+
+      // Add to Firebase
+      final result = await _technicianService.addTechnician(newTechnician);
+
+      if (mounted) {
+        if (result != null) {
+          // Success
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Technician added successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        } else {
+          // Failed
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to add technician'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${error.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 } 

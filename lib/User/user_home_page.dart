@@ -14,6 +14,33 @@ class UserHomePage extends StatefulWidget {
 
 class _UserHomePageState extends State<UserHomePage> {
   final AuthService _authService = AuthService();
+  String _userName = '';
+  bool _isLoadingName = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final userData = await _authService.getUserProfile();
+      if (mounted) {
+        setState(() {
+          _userName = userData?['name'] ?? '';
+          _isLoadingName = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _userName = '';
+          _isLoadingName = false;
+        });
+      }
+    }
+  }
 
   void _logout() async {
     await _authService.signOut();
@@ -56,6 +83,19 @@ class _UserHomePageState extends State<UserHomePage> {
               color: Colors.blue,
             ),
             const SizedBox(height: 20),
+            // Personalized Greeting
+            if (_isLoadingName)
+              const CircularProgressIndicator()
+            else if (_userName.isNotEmpty)
+              Text(
+                'Hi ${_userName.split(' ').first}',
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
+            const SizedBox(height: 10),
             const Text(
               'Welcome to FixIt',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),

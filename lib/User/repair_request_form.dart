@@ -331,7 +331,7 @@ class _RepairRequestFormState extends State<RepairRequestForm> {
                   icon: const Icon(Icons.map),
                   label: const Text('Set Location on Map'),
                   onPressed: _isSubmitting ? null : () async {
-                    final result = await Navigator.push(
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => LocationPicker(
